@@ -118,12 +118,15 @@ export async function mergeLabels(role, queue, batch, delta) {
   return set.length / 2 + delIds.length;
 }
 
-// nạp hàng loạt (admin): giữ nguyên t nếu có
+// nạp hàng loạt (admin): HSETNX — chỉ điền câu CHƯA có nhãn, không đè nhãn mới hơn
+// mà trang duyệt đã gửi lên. Trả về số câu thật sự được điền.
 export async function importLabels(role, labels) {
-  const set = [];
-  for (const [id, l] of Object.entries(labels)) if (l && l.v) set.push(id, JSON.stringify({ v: l.v, n: String(l.n || ""), t: l.t || new Date().toISOString() }));
-  if (set.length) await redis([["HSET", KEY(role), ...set]]);
-  return set.length / 2;
+  const cmds = [];
+  for (const [id, l] of Object.entries(labels)) if (l && l.v)
+    cmds.push(["HSETNX", KEY(role), id, JSON.stringify({ v: l.v, n: String(l.n || ""), t: l.t || new Date().toISOString() })]);
+  let n = 0;
+  for (let i = 0; i < cmds.length; i += 200) n += (await redis(cmds.slice(i, i + 200))).reduce((a, x) => a + (x ? 1 : 0), 0);
+  return n;
 }
 
 export function json(res, code, body) {

@@ -11,7 +11,7 @@ export default async function handler(req, res) {
   const clean = Object.fromEntries(Object.entries(labels).filter(([id, l]) => ok.has(id) && l && ["1", "0", "?"].includes(l.v)));
   try {
     const n = await importLabels(role, clean);
-    return json(res, 200, { imported: n, skipped: Object.keys(labels).length - n });
+    return json(res, 200, { imported: n, da_co_san: Object.keys(clean).length - n, khong_hop_le: Object.keys(labels).length - Object.keys(clean).length });
   } catch (e) {
     console.error("import", e?.message);
     return json(res, 500, { error: e?.message || String(e) });
