@@ -4,11 +4,10 @@
 //   NB_USERS        JSON {"r1":"<mật khẩu người 1>","r2":"<mật khẩu người 2>"}
 //   NB_SECRET       chuỗi ngẫu nhiên dài để ký cookie
 //   NB_ADMIN_TOKEN  khoá cho /api/export (Claude kéo nhãn về máy)
-//   BLOB_READ_WRITE_TOKEN  Vercel tự thêm khi nối Blob store vào project
+//   KV_REST_API_URL, KV_REST_API_TOKEN  Vercel tự thêm khi nối Upstash Redis vào project
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { del, get, list, put } from "@vercel/blob";
 
 export const ROLES = ["r1", "r2"];
 const COOKIE = "nb";
@@ -74,98 +73,57 @@ export function passages() {
 export const assignedTo = (it, role) => it.a === "both" || it.a === role;
 
 // ---------------------------------------------------------------- nhãn
-// KHÔNG ghi đè blob nào: blob private đọc qua CDN có thể trả bản cũ sau khi bị ghi đè
-// (lỗi "ETag mismatch" ngày 22/10). Mỗi lần lưu là một blob mới, tên không trùng:
-//   labels/<vai>/<hàng>/b<đợt>/<ts 13 số>-<hex>.json        = delta {id: {v,n,t} | null}
-//   labels/<vai>/<hàng>/b<đợt>/<ts 13 số>-zsnap-<hex>.json  = ảnh gộp mọi delta có ts <= ts
-// Đọc: liệt kê, sắp theo tên (= theo thời gian), áp lần lượt. Khi một đợt có nhiều delta,
-// gộp thành một ảnh mới rồi xoá các delta đã gộp. Blob kiểu cũ labels/<vai>/<hàng>/b<n>.json
-// (trước khi sửa) được coi là ảnh nền, áp trước mọi thứ.
-const rnd = () => crypto.randomBytes(4).toString("hex");
-const pad = (n) => String(n).padStart(13, "0");
-const GOP_KHI = 12;
+// Lưu trong Upstash Redis (REST): mỗi vai một hash  nb:labels:<vai>  {id -> JSON {v,n,t}}.
+// Một lần lưu = một lệnh HSET/HDEL; đọc = một lệnh HGETALL. (Vercel Blob bị khoá ngày
+// 22/10/2026 vì vượt hạn mức thao tác của gói Hobby, nên bỏ hẳn Blob.)
+const rUrl = () => process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
+const rTok = () => process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+const KEY = (role) => `nb:labels:${role}`;
 
-async function readBlob(pathname) {
-  // blob mới không bao giờ bị ghi đè nên cache an toàn; blob kiểu cũ thì đọc bỏ qua cache
-  const r = await get(pathname, { access: "private", useCache: !/\/b\d+\.json$/.test(pathname) });
-  if (!r || r.statusCode !== 200 || !r.stream) return {};
-  try { return JSON.parse(await new Response(r.stream).text()) || {}; } catch { return {}; }
-}
-
-async function listAll(prefix) {
-  const out = [];
-  let cursor;
-  do {
-    const page = await list({ prefix, cursor, limit: 1000 });
-    out.push(...page.blobs.map((b) => b.pathname));
-    cursor = page.hasMore ? page.cursor : undefined;
-  } while (cursor);
-  return out;
-}
-
-async function mapLimit(arr, n, fn) {
-  const res = new Array(arr.length); let i = 0;
-  await Promise.all(Array.from({ length: Math.min(n, arr.length) }, async () => {
-    while (i < arr.length) { const k = i++; res[k] = await fn(arr[k]); }
-  }));
-  return res;
-}
-
-// gom theo đợt: "labels/r1/gold3/b1" -> {legacy:[path], parts:[path...] đã sắp}
-function groupPaths(paths) {
-  const g = new Map();
-  for (const p of paths) {
-    let m = p.match(/^(labels\/[^/]+\/[^/]+\/b\d+)\.json$/);
-    if (m) { if (!g.has(m[1])) g.set(m[1], { legacy: [], parts: [] }); g.get(m[1]).legacy.push(p); continue; }
-    m = p.match(/^(labels\/[^/]+\/[^/]+\/b\d+)\/(\d{13})-.+\.json$/);
-    if (m) { if (!g.has(m[1])) g.set(m[1], { legacy: [], parts: [] }); g.get(m[1]).parts.push(p); }
-  }
-  for (const v of g.values()) v.parts.sort();
-  return g;
-}
-
-function apply(state, data, isDelta) {
-  for (const [id, l] of Object.entries(data || {})) {
-    if (l && l.v) state[id] = l; else if (isDelta) delete state[id];
-  }
-}
-
-async function readGroup(dir, { legacy, parts }) {
-  const blobs = await mapLimit([...legacy, ...parts], 12, readBlob);
-  let state = {};
-  blobs.forEach((data, i) => {
-    const p = i < legacy.length ? null : parts[i - legacy.length];
-    if (p && /-zsnap-/.test(p)) { state = {}; apply(state, data, false); } // ảnh gộp đã chứa mọi thứ trước nó
-    else apply(state, data, p !== null);
+async function redis(commands) {
+  if (!rUrl() || !rTok()) throw new Error("Chưa nối Upstash Redis (thiếu KV_REST_API_URL/TOKEN)");
+  const r = await fetch(rUrl().replace(/\/$/, "") + "/pipeline", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${rTok()}`, "Content-Type": "application/json" },
+    body: JSON.stringify(commands),
+    signal: AbortSignal.timeout(15000),
   });
-  // gộp khi nhiều delta: ảnh mới mang ts của delta cuối, rồi xoá các delta đã gộp
-  const deltas = parts.filter((p) => !/-zsnap-/.test(p));
-  if (deltas.length >= GOP_KHI) {
-    try {
-      const lastTs = parts[parts.length - 1].slice(dir.length + 1, dir.length + 14);
-      await put(`${dir}/${lastTs}-zsnap-${rnd()}.json`, JSON.stringify(state), {
-        access: "private", contentType: "application/json", addRandomSuffix: false });
-      await del(parts); // legacy giữ lại làm nền (đọc chỉ một lần, không bao giờ ghi lại)
-    } catch (e) { console.error("gop", dir, e?.message); }
-  }
-  return state;
+  const j = await r.json().catch(() => null);
+  if (!r.ok || !Array.isArray(j)) throw new Error(`Redis ${r.status}: ${JSON.stringify(j).slice(0, 200)}`);
+  const bad = j.find((x) => x && x.error);
+  if (bad) throw new Error("Redis: " + bad.error);
+  return j.map((x) => x.result);
 }
 
 export async function readLabels(role) {
-  const groups = groupPaths(await listAll(`labels/${role}/`));
+  const [flat] = await redis([["HGETALL", KEY(role)]]);
   const out = {};
-  const states = await mapLimit([...groups], 4, ([dir, g]) => readGroup(dir, g));
-  for (const st of states) Object.assign(out, st);
-  for (const k of Object.keys(out)) if (!out[k] || !out[k].v) delete out[k];
+  for (let i = 0; flat && i < flat.length; i += 2) {
+    try { const l = JSON.parse(flat[i + 1]); if (l && l.v) out[flat[i]] = l; } catch {}
+  }
   return out;
 }
 
+// queue, batch giữ trong chữ ký cho các API cũ; khoá theo vai là đủ
 export async function mergeLabels(role, queue, batch, delta) {
-  const t = new Date().toISOString(), body = {};
-  for (const [id, l] of Object.entries(delta)) body[id] = l && l.v ? { v: l.v, n: String(l.n || "").slice(0, 2000), t } : null;
-  await put(`labels/${role}/${queue}/b${batch}/${pad(Date.now())}-${rnd()}.json`, JSON.stringify(body), {
-    access: "private", contentType: "application/json", addRandomSuffix: false });
-  return Object.keys(body).length;
+  const t = new Date().toISOString(), set = [], delIds = [];
+  for (const [id, l] of Object.entries(delta)) {
+    if (l && l.v) set.push(id, JSON.stringify({ v: l.v, n: String(l.n || "").slice(0, 2000), t }));
+    else delIds.push(id);
+  }
+  const cmds = [];
+  if (set.length) cmds.push(["HSET", KEY(role), ...set]);
+  if (delIds.length) cmds.push(["HDEL", KEY(role), ...delIds]);
+  if (cmds.length) await redis(cmds);
+  return set.length / 2 + delIds.length;
+}
+
+// nạp hàng loạt (admin): giữ nguyên t nếu có
+export async function importLabels(role, labels) {
+  const set = [];
+  for (const [id, l] of Object.entries(labels)) if (l && l.v) set.push(id, JSON.stringify({ v: l.v, n: String(l.n || ""), t: l.t || new Date().toISOString() }));
+  if (set.length) await redis([["HSET", KEY(role), ...set]]);
+  return set.length / 2;
 }
 
 export function json(res, code, body) {

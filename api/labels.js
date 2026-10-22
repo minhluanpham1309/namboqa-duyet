@@ -20,21 +20,13 @@ export default async function handler(req, res) {
     const { changes } = await body(req);
     if (!changes || typeof changes !== "object") return json(res, 400, { error: "Thiếu changes." });
     const index = new Map(items().filter((it) => assignedTo(it, role)).map((it) => [it.id, it]));
-    const groups = new Map();
+    const delta = {};
     for (const [id, l] of Object.entries(changes)) {
-      const it = index.get(id);
-      if (!it) continue;                                   // không phải câu của mình: bỏ qua
+      if (!index.has(id)) continue;                         // không phải câu của mình: bỏ qua
       if (l && !["1", "0", "?"].includes(l.v)) continue;
-      const g = `${it.q}|${it.b}`;
-      if (!groups.has(g)) groups.set(g, {});
-      groups.get(g)[id] = l && l.v ? { v: l.v, n: l.n || "" } : null;
+      delta[id] = l && l.v ? { v: l.v, n: l.n || "" } : null;
     }
-    let saved = 0;
-    for (const [g, delta] of groups) {
-      const [q, b] = g.split("|");
-      await mergeLabels(role, q, b, delta);
-      saved += Object.keys(delta).length;
-    }
+    const saved = await mergeLabels(role, null, null, delta);
     return json(res, 200, { saved });
   } catch (e) {
     console.error("labels", req.method, role, e?.name, e?.message);
