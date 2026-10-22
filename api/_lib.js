@@ -8,7 +8,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { BlobPreconditionFailedError, get, list, put } from "@vercel/blob";
+import { del, get, list, put } from "@vercel/blob";
 
 export const ROLES = ["r1", "r2"];
 const COOKIE = "nb";
@@ -74,54 +74,98 @@ export function passages() {
 export const assignedTo = (it, role) => it.a === "both" || it.a === role;
 
 // ---------------------------------------------------------------- nhãn
-// Mỗi người × hàng × đợt là một blob private: labels/<role>/<queue>/b<batch>.json
-// = {"<id>": {"v":"1"|"0"|"?","n":"ghi chú","t":"ISO"}}. Ghi bằng read-merge-write
-// có ifMatch (etag) để hai lần lưu gần nhau không đè mất nhãn của nhau.
-const key = (role, queue, batch) => `labels/${role}/${queue}/b${batch}.json`;
+// KHÔNG ghi đè blob nào: blob private đọc qua CDN có thể trả bản cũ sau khi bị ghi đè
+// (lỗi "ETag mismatch" ngày 22/10). Mỗi lần lưu là một blob mới, tên không trùng:
+//   labels/<vai>/<hàng>/b<đợt>/<ts 13 số>-<hex>.json        = delta {id: {v,n,t} | null}
+//   labels/<vai>/<hàng>/b<đợt>/<ts 13 số>-zsnap-<hex>.json  = ảnh gộp mọi delta có ts <= ts
+// Đọc: liệt kê, sắp theo tên (= theo thời gian), áp lần lượt. Khi một đợt có nhiều delta,
+// gộp thành một ảnh mới rồi xoá các delta đã gộp. Blob kiểu cũ labels/<vai>/<hàng>/b<n>.json
+// (trước khi sửa) được coi là ảnh nền, áp trước mọi thứ.
+const rnd = () => crypto.randomBytes(4).toString("hex");
+const pad = (n) => String(n).padStart(13, "0");
+const GOP_KHI = 12;
 
 async function readBlob(pathname) {
-  const r = await get(pathname, { access: "private", useCache: false });
-  if (!r || r.statusCode !== 200 || !r.stream) return { data: {}, etag: null };
-  const text = await new Response(r.stream).text();
-  let data = {};
-  try { data = JSON.parse(text) || {}; } catch { data = {}; }
-  return { data, etag: r.blob?.etag || null };
+  // blob mới không bao giờ bị ghi đè nên cache an toàn; blob kiểu cũ thì đọc bỏ qua cache
+  const r = await get(pathname, { access: "private", useCache: !/\/b\d+\.json$/.test(pathname) });
+  if (!r || r.statusCode !== 200 || !r.stream) return {};
+  try { return JSON.parse(await new Response(r.stream).text()) || {}; } catch { return {}; }
+}
+
+async function listAll(prefix) {
+  const out = [];
+  let cursor;
+  do {
+    const page = await list({ prefix, cursor, limit: 1000 });
+    out.push(...page.blobs.map((b) => b.pathname));
+    cursor = page.hasMore ? page.cursor : undefined;
+  } while (cursor);
+  return out;
+}
+
+async function mapLimit(arr, n, fn) {
+  const res = new Array(arr.length); let i = 0;
+  await Promise.all(Array.from({ length: Math.min(n, arr.length) }, async () => {
+    while (i < arr.length) { const k = i++; res[k] = await fn(arr[k]); }
+  }));
+  return res;
+}
+
+// gom theo đợt: "labels/r1/gold3/b1" -> {legacy:[path], parts:[path...] đã sắp}
+function groupPaths(paths) {
+  const g = new Map();
+  for (const p of paths) {
+    let m = p.match(/^(labels\/[^/]+\/[^/]+\/b\d+)\.json$/);
+    if (m) { if (!g.has(m[1])) g.set(m[1], { legacy: [], parts: [] }); g.get(m[1]).legacy.push(p); continue; }
+    m = p.match(/^(labels\/[^/]+\/[^/]+\/b\d+)\/(\d{13})-.+\.json$/);
+    if (m) { if (!g.has(m[1])) g.set(m[1], { legacy: [], parts: [] }); g.get(m[1]).parts.push(p); }
+  }
+  for (const v of g.values()) v.parts.sort();
+  return g;
+}
+
+function apply(state, data, isDelta) {
+  for (const [id, l] of Object.entries(data || {})) {
+    if (l && l.v) state[id] = l; else if (isDelta) delete state[id];
+  }
+}
+
+async function readGroup(dir, { legacy, parts }) {
+  const blobs = await mapLimit([...legacy, ...parts], 12, readBlob);
+  let state = {};
+  blobs.forEach((data, i) => {
+    const p = i < legacy.length ? null : parts[i - legacy.length];
+    if (p && /-zsnap-/.test(p)) { state = {}; apply(state, data, false); } // ảnh gộp đã chứa mọi thứ trước nó
+    else apply(state, data, p !== null);
+  });
+  // gộp khi nhiều delta: ảnh mới mang ts của delta cuối, rồi xoá các delta đã gộp
+  const deltas = parts.filter((p) => !/-zsnap-/.test(p));
+  if (deltas.length >= GOP_KHI) {
+    try {
+      const lastTs = parts[parts.length - 1].slice(dir.length + 1, dir.length + 14);
+      await put(`${dir}/${lastTs}-zsnap-${rnd()}.json`, JSON.stringify(state), {
+        access: "private", contentType: "application/json", addRandomSuffix: false });
+      await del(parts); // legacy giữ lại làm nền (đọc chỉ một lần, không bao giờ ghi lại)
+    } catch (e) { console.error("gop", dir, e?.message); }
+  }
+  return state;
 }
 
 export async function readLabels(role) {
+  const groups = groupPaths(await listAll(`labels/${role}/`));
   const out = {};
-  let cursor;
-  do {
-    const page = await list({ prefix: `labels/${role}/`, cursor, limit: 1000 });
-    for (const b of page.blobs) {
-      const { data } = await readBlob(b.pathname);
-      Object.assign(out, data);
-    }
-    cursor = page.hasMore ? page.cursor : undefined;
-  } while (cursor);
+  const states = await mapLimit([...groups], 4, ([dir, g]) => readGroup(dir, g));
+  for (const st of states) Object.assign(out, st);
   for (const k of Object.keys(out)) if (!out[k] || !out[k].v) delete out[k];
   return out;
 }
 
 export async function mergeLabels(role, queue, batch, delta) {
-  const p = key(role, queue, batch);
-  for (let attempt = 0; attempt < 4; attempt++) {
-    const { data, etag } = await readBlob(p);
-    for (const [id, l] of Object.entries(delta)) {
-      if (l && l.v) data[id] = { v: l.v, n: String(l.n || "").slice(0, 2000), t: new Date().toISOString() };
-      else delete data[id];
-    }
-    try {
-      await put(p, JSON.stringify(data), {
-        access: "private", contentType: "application/json", addRandomSuffix: false,
-        allowOverwrite: true, ...(etag ? { ifMatch: etag } : {}),
-      });
-      return Object.keys(data).length;
-    } catch (e) {
-      if (attempt === 3 || !(e instanceof BlobPreconditionFailedError)) throw e;
-      await new Promise((r) => setTimeout(r, 150 + Math.random() * 300));
-    }
-  }
+  const t = new Date().toISOString(), body = {};
+  for (const [id, l] of Object.entries(delta)) body[id] = l && l.v ? { v: l.v, n: String(l.n || "").slice(0, 2000), t } : null;
+  await put(`labels/${role}/${queue}/b${batch}/${pad(Date.now())}-${rnd()}.json`, JSON.stringify(body), {
+    access: "private", contentType: "application/json", addRandomSuffix: false });
+  return Object.keys(body).length;
 }
 
 export function json(res, code, body) {
