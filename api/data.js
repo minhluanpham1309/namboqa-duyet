@@ -1,18 +1,40 @@
-import { assignedTo, items, json, passages, session } from "./_lib.js";
+import { assignedTo, items, json, passages, readLabels, session } from "./_lib.js";
 
-// GET -> các cặp giao cho người đang đăng nhập + đúng các đoạn tài liệu chúng cần.
-// Dữ liệu nằm trong repo private, chỉ trả về sau khi đăng nhập.
-export default function handler(req, res) {
+// GET /api/data                 -> chỉ mục gọn {id,q,b} của mọi câu giao cho người đăng nhập
+// GET /api/data?queue=Q&b=N     -> chi tiết các câu của một đợt + đoạn tài liệu chúng cần
+// Hàng dd3 (diễn đạt lại gold vòng 3): ẩn câu có câu gốc đã bị chấm Loại.
+const ORDER = ["gold3", "silver_mau", "silver", "dd1", "dd3"];
+
+async function rejectedSources() {
+  const [a, b] = await Promise.all([readLabels("r1"), readLabels("r2")]);
+  const rej = new Set();
+  for (const L of [a, b]) for (const [id, l] of Object.entries(L)) if (l.v === "0") rej.add(id);
+  return rej;
+}
+
+export default async function handler(req, res) {
   const role = session(req);
   if (!role) return json(res, 401, { error: "Chưa đăng nhập." });
-  const mine = items().filter((it) => assignedTo(it, role));
-  const need = new Set();
-  for (const it of mine) for (const p of it.ctx) need.add(p);
-  const P = passages(), pas = {};
-  for (const p of need) pas[p] = P[p];
-  // đếm số câu giao cho người kia theo hàng, để trang hiện tiến độ của họ
-  const other = role === "r1" ? "r2" : "r1";
-  const otherTotal = {};
-  for (const it of items()) if (assignedTo(it, other)) otherTotal[it.q] = (otherTotal[it.q] || 0) + 1;
-  return json(res, 200, { role, items: mine, passages: pas, otherTotal });
+  try {
+    const u = new URL(req.url, "http://x");
+    const queue = u.searchParams.get("queue"), b = +u.searchParams.get("b");
+    const rej = await rejectedSources();
+    const visible = (it) => !(it.q === "dd3" && it.goc && rej.has(it.goc.id));
+    const mine = items().filter((it) => assignedTo(it, role) && visible(it));
+    if (!queue) {
+      const other = role === "r1" ? "r2" : "r1";
+      const otherTotal = {};
+      for (const it of items()) if (assignedTo(it, other) && visible(it)) otherTotal[it.q] = (otherTotal[it.q] || 0) + 1;
+      const qs = ORDER.filter((q) => mine.some((it) => it.q === q));
+      return json(res, 200, { role, queues: qs, index: mine.map((it) => [it.id, it.q, it.b]), otherTotal,
+                              hiddenDd3: items().filter((it) => assignedTo(it, role) && !visible(it)).length });
+    }
+    const sel = mine.filter((it) => it.q === queue && it.b === b);
+    const P = passages(), pas = {};
+    for (const it of sel) for (const p of it.ctx) pas[p] = P[p];
+    return json(res, 200, { items: sel, passages: pas });
+  } catch (e) {
+    console.error("data", e?.message);
+    return json(res, 500, { error: "Không tải được dữ liệu: " + (e?.message || e) });
+  }
 }

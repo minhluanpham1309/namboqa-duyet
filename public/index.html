@@ -208,6 +208,15 @@ details.guide li{margin:3px 0}
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
   let role = null, ITEMS = [], PAS = {}, LBL = {}, otherDone = {}, otherTotal = {};
+  let QUEUES = [], DETAIL = {}; const LOADED = new Map();   // ITEMS = chỉ mục {id,q,b}; DETAIL = chi tiết đợt đã tải
+  const QNAME = {gold3: "Gold vòng 3", silver_mau: "Mẫu silver", silver: "Silver (máy sinh)", dd1: "Diễn đạt lại · gold vòng 1–2", dd3: "Diễn đạt lại · gold vòng 3"};
+  function loadBatch(q, b){
+    const k = q + "|" + b;
+    if (!LOADED.has(k)) LOADED.set(k, api(`/api/data?queue=${encodeURIComponent(q)}&b=${b}`).then(d => {
+      for (const it of d.items) DETAIL[it.id] = it; Object.assign(PAS, d.passages); return true;
+    }).catch(e => { LOADED.delete(k); throw e; }));
+    return LOADED.get(k);
+  }
   let queue = store.get("nb_queue") || "gold3", batch = +(store.get("nb_batch") || 1), filter = store.get("nb_filter") || "todo";
   let view = [], idx = 0, curId = null;
   let pending = {}, timer = null, saving = false, lastOk = Date.now();
@@ -261,7 +270,7 @@ details.guide li{margin:3px 0}
     $("loading").hidden = false; $("loading").textContent = "Đang tải dữ liệu duyệt…"; $("card").hidden = true;
     try {
       const [d, l] = await Promise.all([api("/api/data"), api("/api/labels")]);
-      ITEMS = d.items; PAS = d.passages; otherTotal = d.otherTotal || {};
+      ITEMS = d.index.map(([id, q, b]) => ({id, q, b})); QUEUES = d.queues; otherTotal = d.otherTotal || {};
       LBL = l.mine || {}; otherDone = l.otherDone || {};
     } catch (e) {
       if (e.status === 401) return showLogin();
@@ -302,9 +311,9 @@ details.guide li{margin:3px 0}
   // ------------------------------------------------------------- điều khiển
   const mine = (it) => it.q === queue;
   function initControls(){
-    const qs = [...new Set(ITEMS.map(x => x.q))];
+    const qs = QUEUES;
     if (!qs.includes(queue)) queue = qs[0] || "gold3";
-    $("queue").innerHTML = qs.map(q => `<option value="${q}">${q === "gold3" ? "Gold vòng 3" : q === "silver_mau" ? "Mẫu silver" : esc(q)}</option>`).join("");
+    $("queue").innerHTML = qs.map(q => `<option value="${q}">${esc(QNAME[q] || q)}</option>`).join("");
     $("queue").value = queue; $("filter").value = filter;
     $("queue").onchange = (e) => { queue = e.target.value; store.set("nb_queue", queue); batch = 1; rebuild(); };
     $("batch").onchange = (e) => { batch = +e.target.value; store.set("nb_batch", batch); rebuild(); };
@@ -328,16 +337,26 @@ details.guide li{margin:3px 0}
   }
 
   function batches(){ return [...new Set(ITEMS.filter(mine).map(x=>x.b))].sort((a,b)=>a-b); }
-  function rebuild(keepPos){
+  let rebuildSeq = 0;
+  async function rebuild(keepPos){
+    const seq = ++rebuildSeq;
     const bs = batches();
     if (!bs.includes(batch)) batch = bs[0] || 1;
     $("batch").innerHTML = bs.map(b => {
       const all = ITEMS.filter(x => mine(x) && x.b===b); const d = all.filter(x => LBL[x.id]).length;
       return `<option value="${b}">${b} · ${d}/${all.length}</option>`; }).join("");
     $("batch").value = batch;
+    if (bs.length && !LOADED.has(queue + "|" + batch)) showEmpty("Đang tải đợt " + batch + "…");
+    if (bs.length) {
+      try { await loadBatch(queue, batch); }
+      catch (e) { if (seq === rebuildSeq) showEmpty("Không tải được đợt này: " + e.message + ". Chọn lại đợt để thử lần nữa."); return; }
+      if (seq !== rebuildSeq) return;
+      const nb = bs[bs.indexOf(batch) + 1]; if (nb) loadBatch(queue, nb).catch(() => {});   // tải trước đợt sau
+    }
     const base = ITEMS.filter(x => mine(x) && x.b === batch);
     view = base.filter(x => { const l = LBL[x.id];
-      return filter==="all" ? true : filter==="todo" ? !l : filter==="q" ? (l && l.v==="?") : !!l; });
+      return filter==="all" ? true : filter==="todo" ? !l : filter==="q" ? (l && l.v==="?") : !!l; })
+      .map(x => DETAIL[x.id]).filter(Boolean);
     if (!bs.length) { showEmpty("Không có câu nào giao cho bạn ở hàng này."); refreshCounts(); return; }
     if (!view.length) { showEmpty(filter==="todo" ? "Đợt này bạn đã duyệt xong. Chọn đợt khác ở thanh trên, hoặc đổi bộ lọc sang “Tất cả” để xem lại." : "Không có câu nào khớp bộ lọc."); refreshCounts(); return; }
     let s = 0;
@@ -363,8 +382,10 @@ details.guide li{margin:3px 0}
     $("evBox").hidden = it.type === "unanswerable";
     $("evs").innerHTML = (it.ev||[]).map(e => `<p class="ev">${esc(e)}</p>`).join("");
     const rw = it.nguon && it.nguon.startsWith("VIẾT LẠI");
-    $("rewrite").hidden = !rw;
+    $("rewrite").hidden = !(rw || it.goc || it.q === "silver");
     if (rw) $("rewrite").textContent = "Câu này do máy viết lại từ một câu bị loại vì lỗi tên địa điểm. Câu gốc: " + it.nguon.replace(/^VIẾT LẠI từ [^:]+:\s*/, "") + " — kiểm tra nghĩa có bị lệch không.";
+    else if (it.goc) $("rewrite").innerHTML = `<b>Diễn đạt lại của câu ${esc(it.goc.id)}:</b> “${esc(it.goc.question)}” → ${esc(it.goc.answer)}<br>Đạt khi câu mới hỏi đúng cùng ý, tự nhiên, và đáp án vẫn đúng theo tài liệu. Câu gốc có sai hay không không ảnh hưởng: chỉ chấm câu đang hiện.`;
+    else if (it.q === "silver") $("rewrite").textContent = "Câu do máy sinh và máy đã chấm Đạt. Chấm như gold: cùng tiêu chí, không nương tay.";
     $("hint").innerHTML = HINT[it.type] || "";
     paintDecision(); paintDocs(it);
     window.scrollTo({top:0});
@@ -406,8 +427,8 @@ details.guide li{margin:3px 0}
     save(curId, v, n); paintDecision();
     if (v !== "?" || fromNote) setTimeout(advance, 160);
   }
-  function advance(){
-    if (filter === "todo") { const cur = curId; rebuild(true); const k = view.findIndex(x=>!LBL[x.id] && x.id!==cur); if (k>=0) go(k); }
+  async function advance(){
+    if (filter === "todo") { const cur = curId; await rebuild(true); const k = view.findIndex(x=>!LBL[x.id] && x.id!==cur); if (k>=0) go(k); }
     else go(idx+1);
   }
   function jumpTodo(){
