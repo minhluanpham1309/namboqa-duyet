@@ -84,6 +84,7 @@ const rUrl = () => process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST
 const rTok = () => process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
 const KEY = (role) => `nb:labels:${role}`;
 
+export const redisCmd = (c) => redis(c);
 async function redis(commands) {
   if (!rUrl() || !rTok()) throw new Error("Chưa nối Upstash Redis (thiếu KV_REST_API_URL/TOKEN)");
   const r = await fetch(rUrl().replace(/\/$/, "") + "/pipeline", {
