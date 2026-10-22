@@ -130,7 +130,7 @@ details.guide li{margin:3px 0}
     </label>
     <label class="ctl" for="batch">Đợt <select id="batch"></select></label>
     <label class="ctl" for="filter">Hiện
-      <select id="filter"><option value="todo">Chưa duyệt</option><option value="all">Tất cả</option><option value="q">Chưa chắc</option><option value="done">Đã duyệt</option></select>
+      <select id="filter"><option value="todo">Chưa duyệt</option><option value="all">Tất cả</option><option value="q">Chưa chắc</option><option value="done">Đã duyệt</option><option value="lnote">Loại chưa ghi chú</option></select>
     </label>
     <div class="prog" aria-live="polite">
       <div class="row"><span id="progLbl">Đợt này</span><span id="progNum">–</span></div>
@@ -350,7 +350,8 @@ details.guide li{margin:3px 0}
     if (!bs.includes(batch)) batch = bs[0] || 1;
     $("batch").innerHTML = bs.map(b => {
       const all = ITEMS.filter(x => mine(x) && x.b===b); const d = all.filter(x => LBL[x.id]).length;
-      return `<option value="${b}">${b} · ${d}/${all.length}</option>`; }).join("");
+      const thieu = filter==="lnote" ? all.filter(x => LBL[x.id] && LBL[x.id].v==="0" && !(LBL[x.id].n||"").trim()).length : 0;
+      return `<option value="${b}">${b} · ${d}/${all.length}${filter==="lnote" ? " · thiếu " + thieu : ""}</option>`; }).join("");
     $("batch").value = batch;
     if (bs.length && !LOADED.has(queue + "|" + batch)) showEmpty("Đang tải đợt " + batch + "…");
     if (bs.length) {
@@ -361,10 +362,11 @@ details.guide li{margin:3px 0}
     }
     const base = ITEMS.filter(x => mine(x) && x.b === batch);
     view = base.filter(x => { const l = LBL[x.id];
-      return filter==="all" ? true : filter==="todo" ? !l : filter==="q" ? (l && l.v==="?") : !!l; })
+      return filter==="all" ? true : filter==="todo" ? !l : filter==="q" ? (l && l.v==="?")
+        : filter==="lnote" ? (l && l.v==="0" && !(l.n || "").trim()) : !!l; })
       .map(x => DETAIL[x.id]).filter(Boolean);
     if (!bs.length) { showEmpty("Không có câu nào giao cho bạn ở hàng này."); refreshCounts(); return; }
-    if (!view.length) { showEmpty(filter==="todo" ? "Đợt này bạn đã duyệt xong. Chọn đợt khác ở thanh trên, hoặc đổi bộ lọc sang “Tất cả” để xem lại." : "Không có câu nào khớp bộ lọc."); refreshCounts(); return; }
+    if (!view.length) { showEmpty(filter==="lnote" ? "Đợt này không còn câu Loại nào thiếu ghi chú. Chọn đợt khác ở thanh trên." : filter==="todo" ? "Đợt này bạn đã duyệt xong. Chọn đợt khác ở thanh trên, hoặc đổi bộ lọc sang “Tất cả” để xem lại." : "Không có câu nào khớp bộ lọc."); refreshCounts(); return; }
     let s = 0;
     const saved = store.get(`nb_pos_${role}_${queue}_${batch}`);
     if (keepPos && curId) { const k = view.findIndex(x=>x.id===curId); if (k>=0) s=k; }
