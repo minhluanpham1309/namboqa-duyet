@@ -277,7 +277,13 @@ details.guide li{margin:3px 0}
       $("loading").textContent = "Không tải được dữ liệu: " + e.message + ". Tải lại trang để thử lần nữa."; return;
     }
     initControls(); rebuild();
-    setInterval(async () => { try { const l = await api("/api/labels"); otherDone = l.otherDone || {}; refreshCounts(); } catch {} }, 120000);
+    // Đồng bộ nhãn mỗi 30 giây: nhận nhãn chấm ở tab/máy khác của cùng người (không đè nhãn đang chờ lưu ở tab này)
+    setInterval(async () => { if (document.visibilityState !== "visible") return;
+      try { const l = await api("/api/labels"); otherDone = l.otherDone || {};
+        const srv = l.mine || {};
+        for (const id of Object.keys(LBL)) if (!(id in srv) && !(id in pending)) delete LBL[id];
+        for (const [id, v] of Object.entries(srv)) if (!(id in pending)) LBL[id] = v;
+        refreshCounts(); if (curId) paintDecision(); } catch {} }, 30000);
   }
 
   // ------------------------------------------------------------- lưu nhãn
