@@ -132,8 +132,10 @@ export function json(res, code, body) {
 }
 
 export async function body(req) {
-  if (req.body && typeof req.body === "object") return req.body;
-  if (typeof req.body === "string") { try { return JSON.parse(req.body); } catch { return {}; } }
+  let b;
+  try { b = req.body; } catch { return {}; }          // Vercel ném lỗi khi JSON hỏng
+  if (b && typeof b === "object") return b;
+  if (typeof b === "string") { try { return JSON.parse(b); } catch { return {}; } }
   const chunks = [];
   for await (const c of req) chunks.push(c);
   try { return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}"); } catch { return {}; }
