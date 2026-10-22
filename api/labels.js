@@ -37,6 +37,7 @@ export default async function handler(req, res) {
     }
     return json(res, 200, { saved });
   } catch (e) {
+    console.error("labels", req.method, role, e?.name, e?.message);
     return json(res, 500, { error: "Lưu thất bại: " + (e?.message || e) });
   }
 }

@@ -108,7 +108,6 @@ details.guide li{margin:3px 0}
 </style>
 </head>
 <body>
-@@BODY@@
 <div id="loginView" hidden>
   <div class="wrap"><form class="login" id="loginForm" autocomplete="on">
     <h1>Phòng duyệt NamBoQA</h1>
@@ -211,10 +210,18 @@ details.guide li{margin:3px 0}
   let role = null, ITEMS = [], PAS = {}, LBL = {}, otherDone = {}, otherTotal = {};
   let queue = store.get("nb_queue") || "gold3", batch = +(store.get("nb_batch") || 1), filter = store.get("nb_filter") || "todo";
   let view = [], idx = 0, curId = null;
-  let pending = {}, timer = null, saving = false;
+  let pending = {}, timer = null, saving = false, lastOk = Date.now();
+  // Cảnh báo dính trên đầu trang khi còn nhãn chưa lên server quá 30 giây
+  setInterval(() => { const n = Object.keys(pending).length;
+    if (n && Date.now() - lastOk > 30000) banner(`Còn ${n} nhãn chưa lưu lên server. Đừng tải lại hay đóng trang; trang đang tự thử lại.`);
+    else if (!n && $("banner").textContent.startsWith("Còn ")) banner(""); }, 5000);
 
   const api = async (path, opts = {}) => {
-    const r = await fetch(path, {credentials: "same-origin", headers: {"Content-Type": "application/json"}, ...opts});
+    const ctl = new AbortController(); const tmo = setTimeout(() => ctl.abort(), opts.method === "POST" ? 20000 : 30000);
+    let r;
+    try { r = await fetch(path, {credentials: "same-origin", headers: {"Content-Type": "application/json"}, signal: ctl.signal, ...opts}); }
+    catch (e) { throw new Error(e.name === "AbortError" ? "hết thời gian chờ" : "lỗi mạng"); }
+    finally { clearTimeout(tmo); }
     let j = {}; try { j = await r.json(); } catch {}
     if (!r.ok) { const e = new Error(j.error || ("HTTP " + r.status)); e.status = r.status; throw e; }
     return j;
@@ -277,13 +284,14 @@ details.guide li{margin:3px 0}
     const changes = pending; if (!Object.keys(changes).length) return;
     pending = {}; saving = true;
     try {
-      await api("/api/labels", {method:"POST", keepalive: true, body: JSON.stringify({changes})});
+      await api("/api/labels", {method:"POST", body: JSON.stringify({changes})});
+      lastOk = Date.now();
       if (!Object.keys(pending).length) $("saved").textContent = "Đã lưu";
       banner("");
     } catch (e) {
       pending = {...changes, ...pending};
       if (e.status === 401) { banner("Phiên đăng nhập đã hết hạn. Đăng nhập lại; các nhãn chưa lưu vẫn nằm trên trang này, đừng tải lại trang."); }
-      else { $("saved").textContent = "Chưa lưu được, đang thử lại…"; }
+      else { $("saved").textContent = `Chưa lưu được ${Object.keys(pending).length} nhãn (${e.message}), đang thử lại…`; }
       clearTimeout(timer); timer = setTimeout(flush, 3000 + Math.random()*2000);
     } finally { saving = false; }
   }
