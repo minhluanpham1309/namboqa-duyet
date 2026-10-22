@@ -113,7 +113,7 @@ details.guide li{margin:3px 0}
     <h1>Phòng duyệt NamBoQA</h1>
     <p>Mỗi người duyệt đăng nhập bằng mật khẩu riêng. Nhãn của bạn chỉ bạn thấy.</p>
     <label>Bạn là</label>
-    <div class="seg" role="group" aria-label="Vai"><button type="button" id="lr1" aria-pressed="true">Người 1</button><button type="button" id="lr2" aria-pressed="false">Người 2</button></div>
+    <div class="seg" role="group" aria-label="Vai"><button type="button" id="lr1" aria-pressed="true">Người 1</button><button type="button" id="lr2" aria-pressed="false">Người 2</button><button type="button" id="lr3" aria-pressed="false">Kiểm tra</button></div>
     <label for="pw">Mật khẩu</label>
     <input id="pw" type="password" autocomplete="current-password" required>
     <button class="go" type="submit">Vào duyệt</button>
@@ -200,7 +200,7 @@ details.guide li{margin:3px 0}
     compare: "<b>Compare:</b> phải so đúng một thuộc tính chung mà cả hai tài liệu đều nêu.",
     unanswerable: "<b>Không trả lời được:</b> đọc hết các đoạn bên phải. Chỉ Đạt khi tài liệu thật sự không có câu trả lời và câu hỏi hợp lý, tự nhiên."
   };
-  const NAME = {r1: "Người 1", r2: "Người 2"};
+  const NAME = {r1: "Người 1", r2: "Người 2", r3: "Người kiểm tra"};
   const store = {
     get(k){ try { return localStorage.getItem(k); } catch { return null; } },
     set(k,v){ try { localStorage.setItem(k,v); } catch {} }
@@ -209,7 +209,7 @@ details.guide li{margin:3px 0}
 
   let role = null, ITEMS = [], PAS = {}, LBL = {}, otherDone = {}, otherTotal = {};
   let QUEUES = [], DETAIL = {}; const LOADED = new Map();   // ITEMS = chỉ mục {id,q,b}; DETAIL = chi tiết đợt đã tải
-  const QNAME = {gold3: "Gold vòng 3", silver_mau: "Mẫu silver", silver: "Silver (máy sinh)", dd1: "Diễn đạt lại · gold vòng 1–2", dd3: "Diễn đạt lại · gold vòng 3"};
+  const QNAME = {kiemtra: "Kiểm tra chéo (150 câu)", gold3: "Gold vòng 3", silver_mau: "Mẫu silver", silver: "Silver (máy sinh)", dd1: "Diễn đạt lại · gold vòng 1–2", dd3: "Diễn đạt lại · gold vòng 3"};
   function loadBatch(q, b){
     const k = q + "|" + b;
     if (!LOADED.has(k)) LOADED.set(k, api(`/api/data?queue=${encodeURIComponent(q)}&b=${b}`).then(d => {
@@ -241,8 +241,8 @@ details.guide li{margin:3px 0}
   let loginRole = "r1";
   function showLogin(){
     $("loginView").hidden = false; $("appView").hidden = true;
-    const pick = (r) => { loginRole = r; $("lr1").setAttribute("aria-pressed", r==="r1"); $("lr2").setAttribute("aria-pressed", r==="r2"); };
-    $("lr1").onclick = () => pick("r1"); $("lr2").onclick = () => pick("r2");
+    const pick = (r) => { loginRole = r; for (const x of ["r1","r2","r3"]) $("l"+x).setAttribute("aria-pressed", r===x); };
+    $("lr1").onclick = () => pick("r1"); $("lr2").onclick = () => pick("r2"); $("lr3").onclick = () => pick("r3");
     pick(store.get("nb_last_role") || "r1");
     $("loginForm").onsubmit = async (e) => {
       e.preventDefault(); $("loginErr").textContent = "";
@@ -453,8 +453,8 @@ details.guide li{margin:3px 0}
     $("m1").style.width = (100*c["1"]/tot)+"%"; $("m0").style.width = (100*c["0"]/tot)+"%"; $("mq").style.width = (100*c["?"]/tot)+"%";
     const qMine = ITEMS.filter(mine), qDone = qMine.filter(x=>LBL[x.id]).length;
     $("queueNum").textContent = `cả hàng ${qDone}/${qMine.length}`;
-    const other = role==="r1" ? "r2" : "r1";
-    $("otherLbl").textContent = otherTotal[queue] ? `${NAME[other]} đã duyệt ${otherDone[queue]||0}/${otherTotal[queue]}` : "";
+    const other = role==="r1" ? "r2" : role==="r2" ? "r1" : null;
+    $("otherLbl").textContent = other && otherTotal[queue] ? `${NAME[other]} đã duyệt ${otherDone[queue]||0}/${otherTotal[queue]}` : "";
     $("sumAll").textContent = `${ITEMS.length.toLocaleString("vi-VN")} cặp của bạn`;
     const opt = $("batch").selectedOptions[0];
     if (opt) opt.textContent = `${batch} · ${done}/${bItems.length}`;
