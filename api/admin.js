@@ -3,12 +3,12 @@ import { body, isAdmin, json, redisCmd } from "./_lib.js";
 // POST /api/admin  (header x-admin-token)
 //   {action:"archive", role:"r1"}  -> đổi tên nb:labels:<role> thành nb:labels:<role>__luu_<thời điểm>
 //                                     (giữ nguyên dữ liệu, người đó bắt đầu lại từ trang trống)
-//   {action:"move_since", role, since:"ISO"} -> tách nhãn có t >= since sang nb:labels:<role>__tach_<thời điểm>
+//   {action:"move_since", role, since:"ISO", until?:"ISO"} -> tách nhãn có since <= t < until sang nb:labels:<role>__tach_<thời điểm>
 //   {action:"list"}                -> các khoá nhãn đang có và số nhãn trong mỗi khoá
 export default async function handler(req, res) {
   if (!isAdmin(req)) return json(res, 401, { error: "Sai khoá admin." });
   if (req.method !== "POST") return json(res, 405, { error: "method" });
-  const { action, role, since } = await body(req);
+  const { action, role, since, until } = await body(req);
   try {
     if (action === "list") {
       const [keys] = await redisCmd([["KEYS", "nb:labels:*"]]);
@@ -27,7 +27,7 @@ export default async function handler(req, res) {
       const move = [];
       for (let i = 0; flat && i < flat.length; i += 2) {
         let l; try { l = JSON.parse(flat[i + 1]); } catch { continue; }
-        if (l && l.t && l.t >= since) move.push(flat[i], flat[i + 1]);
+        if (l && l.t && l.t >= since && (!until || l.t < until)) move.push(flat[i], flat[i + 1]);
       }
       if (!move.length) return json(res, 200, { moved: 0 });
       const to = `nb:labels:${role}__tach_${new Date().toISOString().replace(/[:.]/g, "-")}`;
