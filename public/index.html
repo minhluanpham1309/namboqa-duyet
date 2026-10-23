@@ -379,6 +379,7 @@ details.guide li{margin:3px 0}
     if (!view.length) return;
     idx = Math.max(0, Math.min(view.length-1, i));
     const it = view[idx]; curId = it.id;
+    if (document.activeElement === $("note")) $("note").blur();
     store.set(`nb_pos_${role}_${queue}_${batch}`, it.id);
     $("loading").hidden = true; $("card").hidden = false;
     $("place").textContent = it.place; $("prov").textContent = it.prov ? "· " + it.prov : "";
@@ -402,7 +403,9 @@ details.guide li{margin:3px 0}
     if (!curId) return;
     const l = LBL[curId];
     for (const [b,v] of [["b1","1"],["b0","0"],["bq","?"]]) $(b).setAttribute("aria-pressed", !!l && l.v===v);
-    if (document.activeElement !== $("note")) $("note").value = l ? (l.n || "") : "";
+    // Ghi chú luôn là của câu đang hiện (trước đây nếu con trỏ còn trong ô ghi chú, ghi chú của câu trước bị mang sang câu sau)
+    if (paintDecision.forId !== curId || document.activeElement !== $("note")) $("note").value = l ? (l.n || "") : "";
+    paintDecision.forId = curId;
     if (!pending[curId]) $("saved").textContent = l ? (l.v==="1"?"Bạn đã chấm: Đạt":l.v==="0"?"Bạn đã chấm: Loại":"Bạn đã chấm: Chưa chắc") : "";
   }
 
