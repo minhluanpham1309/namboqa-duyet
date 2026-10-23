@@ -8,7 +8,7 @@ export default async function handler(req, res) {
   if (!role) return json(res, 401, { error: "Chưa đăng nhập." });
   try {
     if (req.method === "GET") {
-      if (role === "r3") return json(res, 200, { mine: await readLabels("r3"), otherDone: {} });
+      if (role === "r3" || role === "r4") return json(res, 200, { mine: await readLabels(role), otherDone: {} });
       const other = role === "r1" ? "r2" : "r1";
       const [mine, theirs] = await Promise.all([readLabels(role), readLabels(other)]);
       const otherDone = {};

@@ -15,12 +15,12 @@ export default async function handler(req, res) {
       const lens = keys.length ? await redisCmd(keys.map((k) => ["HLEN", k])) : [];
       return json(res, 200, Object.fromEntries(keys.map((k, i) => [k, lens[i]])));
     }
-    if (action === "archive" && ["r1", "r2", "r3"].includes(role)) {
+    if (action === "archive" && ["r1", "r2", "r3", "r4"].includes(role)) {
       const to = `nb:labels:${role}__luu_${new Date().toISOString().replace(/[:.]/g, "-")}`;
       const [ok] = await redisCmd([["RENAME", `nb:labels:${role}`, to]]);
       return json(res, 200, { ok, archived_to: to });
     }
-    if (action === "move_since" && ["r1", "r2", "r3"].includes(role) && /^\d{4}-\d\d-\d\dT/.test(since || "")) {
+    if (action === "move_since" && ["r1", "r2", "r3", "r4"].includes(role) && /^\d{4}-\d\d-\d\dT/.test(since || "")) {
       // Tách các nhãn có t >= since sang khoá riêng (không xoá dữ liệu); người đó chấm lại các câu này.
       const src = `nb:labels:${role}`;
       const [flat] = await redisCmd([["HGETALL", src]]);

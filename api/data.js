@@ -6,9 +6,9 @@ import { asSeenBy, assignedTo, items, json, passages, readLabels, session } from
 const ORDER = ["kiemtra", "gold3", "silver_mau", "silver", "dd1", "dd3"];
 
 async function rejectedSources() {
-  const [a, b] = await Promise.all([readLabels("r1"), readLabels("r2")]);
+  const all = await Promise.all([readLabels("r1"), readLabels("r2"), readLabels("r4")]);
   const rej = new Set();
-  for (const L of [a, b]) for (const [id, l] of Object.entries(L)) if (l.v === "0") rej.add(id);
+  for (const L of all) for (const [id, l] of Object.entries(L)) if (l.v === "0") rej.add(id);
   return rej;
 }
 
