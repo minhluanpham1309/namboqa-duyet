@@ -33,11 +33,14 @@ export function checkPassword(role, pw) {
   return ROLES.includes(role) && typeof u[role] === "string" && u[role].length > 0 && same(u[role], pw || "");
 }
 
+// Chữ ký phiên gắn với mật khẩu hiện tại của vai đó: đổi mật khẩu một người thì
+// phiên cũ của riêng người đó hết hiệu lực, người khác không bị đăng xuất.
+const pwTag = (role) => crypto.createHash("sha256").update(String(users()[role] || "")).digest("base64url").slice(0, 12);
 export function setSession(res, role) {
   const exp = Math.floor(Date.now() / 1000) + MAX_AGE;
   const v = `${role}.${exp}`;
   res.setHeader("Set-Cookie",
-    `${COOKIE}=${v}.${sign(v)}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${MAX_AGE}`);
+    `${COOKIE}=${v}.${sign(v + "." + pwTag(role))}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${MAX_AGE}`);
 }
 
 export function clearSession(res) {
@@ -49,7 +52,10 @@ export function session(req) {
   if (!raw) return null;
   const [role, exp, sig] = raw.slice(COOKIE.length + 1).split(".");
   if (!role || !exp || !sig || !ROLES.includes(role)) return null;
-  if (!same(sign(`${role}.${exp}`), sig)) return null;
+  const ok = same(sign(`${role}.${exp}.${pwTag(role)}`), sig)
+    // phiên kiểu cũ (trước 23/10) chỉ còn nhận cho Người 1, người duy nhất chưa đổi mật khẩu
+    || (role === "r1" && same(sign(`${role}.${exp}`), sig));
+  if (!ok) return null;
   if (+exp < Date.now() / 1000) return null;
   return role;
 }
