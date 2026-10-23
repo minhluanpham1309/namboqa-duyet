@@ -89,6 +89,9 @@ details.guide{margin-top:16px;font-size:13.5px}
 details.guide summary{cursor:pointer;font-weight:600}
 details.guide ul{margin:6px 0 0;padding-left:18px}
 details.guide li{margin:3px 0}
+.rules-h{margin:12px 0 2px;font-weight:600}
+.hint .rl{display:block;margin-top:6px;font-size:12.5px}
+.hint .rl b.k{display:inline-block;min-width:1.4em;color:var(--accent)}
 .empty{padding:40px 18px;text-align:center;color:var(--muted)}
 .keys{font-size:12px;color:var(--muted);margin-top:10px}
 .keys kbd{border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;font-family:var(--f-ui);font-size:11px;background:var(--sunk)}
@@ -169,16 +172,26 @@ details.guide li{margin:3px 0}
         <span class="saved" id="saved"></span>
       </div>
       <div class="keys"><kbd>1</kbd> đạt · <kbd>0</kbd> loại · <kbd>?</kbd> chưa chắc · <kbd>←</kbd> <kbd>→</kbd> chuyển câu · <kbd>N</kbd> câu chưa duyệt kế tiếp</div>
-      <details class="guide" id="guide">
-        <summary>Tiêu chí duyệt (doc/05)</summary>
+      <details class="guide" id="guide" open>
+        <summary>Tiêu chí duyệt và quy tắc thống nhất (áp dụng từ 23/10)</summary>
         <ul>
           <li><b>Đạt</b> khi đủ cả bốn: câu hỏi đứng một mình hiểu được (có tên địa điểm); đáp án đúng theo tài liệu; câu hỏi tự nhiên; hỏi về chính địa điểm đó.</li>
-          <li><b>Loại</b> khi đáp án sai, thiếu hoặc không có trong evidence; câu mơ hồ, nhiều vế, quá dài; tên địa điểm chỉ là cái cớ; câu quá tầm thường.</li>
-          <li><b>Multihop</b> phải thật sự cần cả hai đoạn; một đoạn đã đủ thì loại.</li>
-          <li><b>Compare</b> phải so một thuộc tính chung có thật của cả hai địa điểm.</li>
-          <li><b>Unanswerable</b> chỉ đạt khi toàn bộ tài liệu bên phải KHÔNG trả lời được.</li>
-          <li>Câu <b>viết lại</b>: so với câu gốc, nghĩa lệch thì loại.</li>
-          <li>Không trao đổi với người kia về các câu <b>Cả hai cùng duyệt</b> trong lúc duyệt.</li>
+          <li><b>Multihop</b> phải cần thông tin từ cả hai đoạn. <b>Compare</b> phải so một thuộc tính có thật của cả hai. <b>Không trả lời được</b> chỉ Đạt khi toàn bộ tài liệu bên phải không có câu trả lời.</li>
+          <li>Câu <b>viết lại / diễn đạt lại</b>: so với câu gốc, nghĩa lệch thì Loại.</li>
+          <li>Chọn <b>Loại</b> thì ghi vài chữ lý do. Có thể ghi mã quy tắc, ví dụ "C – tên chung".</li>
+        </ul>
+        <p class="rules-h">Quy tắc cho các trường hợp hay lệch</p>
+        <ul class="rules">
+          <li><b>A. So sánh với địa điểm khác:</b> Câu kiểu "lớn hơn hay nhỏ hơn so với X", "khác gì so với X" (X không có trong tài liệu) → <b>Loại</b>.</li>
+          <li><b>B. Multihop hai vế:</b> "…năm nào và…ở đâu?": <b>Đạt</b> nếu mỗi vế lấy từ một đoạn khác nhau và câu gọn; <b>Loại</b> nếu một đoạn đã đủ cả hai vế hoặc đáp án quá dài.</li>
+          <li><b>C. Tên chung, không biết nơi nào:</b> Tên là danh từ chung hoặc trùng tên ("Vườn cây cao su thời Pháp thuộc", "Chùa Từ Quang" có hai chùa) mà câu không nêu địa danh → <b>Loại</b>.</li>
+          <li><b>D. Câu hiển nhiên:</b> Chỉ <b>Loại</b> khi đáp án đoán được mà không cần đọc tài liệu, hoặc chỉ là biến thể của chính tên (tên khác "Giác Uyển Tự", chùa Khmer thờ Phật Thích Ca). Còn lại <b>Đạt</b>.</li>
+          <li><b>E. Tên địa điểm chỉ là cái cớ:</b> <b>Loại</b> khi câu hỏi về sự kiện, tổ chức, nhân vật mà không nói gì về địa điểm. <b>Đạt</b> nếu sự kiện diễn ra tại địa điểm và là lý do địa điểm được công nhận.</li>
+          <li><b>F. Đáp án lệch loại hoặc thiếu:</b> Hỏi "đối tượng nào" mà đáp "chụp ảnh, thư giãn"; đáp án bỏ sót ý chính tài liệu nêu rõ → <b>Loại</b>.</li>
+          <li><b>G. Tên ghép bằng dấu ";":</b> Tên ghép do bộ dữ liệu đặt, tự nó không phải lỗi → <b>Đạt</b> nếu vẫn hiểu đúng. <b>Loại</b> khi tên ghép làm câu sai nghĩa ("Gò Chùa Nổi tại Đồn Long Khốt") hoặc đáp án chỉ đúng cho một phần của tên.</li>
+          <li><b>H. Không trả lời được, nhiều vế:</b> <b>Đạt</b> nếu các vế cùng một chủ đề (gửi xe + bãi ô tô); <b>Loại</b> nếu gộp hai chủ đề khác nhau (gửi xe + quán ăn).</li>
+          <li><b>I. Tài liệu có nhiều đáp án đúng:</b> Câu chỉ chấp nhận một đáp án trong khi tài liệu có nhiều (hai nhà cùng làm cơ sở…) → <b>Loại</b>.</li>
+          <li><b>J. Câu không tự đứng:</b> Phụ thuộc ngữ cảnh tài liệu ("ông" là ai, "được nhắc đến") hoặc chép nguyên câu văn rồi đục lỗ → <b>Loại</b>.</li>
         </ul>
       </details>
     </div>
@@ -200,6 +213,8 @@ details.guide li{margin:3px 0}
     compare: "<b>Compare:</b> phải so đúng một thuộc tính chung mà cả hai tài liệu đều nêu.",
     unanswerable: "<b>Không trả lời được:</b> đọc hết các đoạn bên phải. Chỉ Đạt khi tài liệu thật sự không có câu trả lời và câu hỏi hợp lý, tự nhiên."
   };
+  const RULES = {"A": "<b>So sánh với địa điểm khác:</b> Câu kiểu \"lớn hơn hay nhỏ hơn so với X\", \"khác gì so với X\" (X không có trong tài liệu) → <b>Loại</b>.", "B": "<b>Multihop hai vế:</b> \"…năm nào và…ở đâu?\": <b>Đạt</b> nếu mỗi vế lấy từ một đoạn khác nhau và câu gọn; <b>Loại</b> nếu một đoạn đã đủ cả hai vế hoặc đáp án quá dài.", "C": "<b>Tên chung, không biết nơi nào:</b> Tên là danh từ chung hoặc trùng tên (\"Vườn cây cao su thời Pháp thuộc\", \"Chùa Từ Quang\" có hai chùa) mà câu không nêu địa danh → <b>Loại</b>.", "D": "<b>Câu hiển nhiên:</b> Chỉ <b>Loại</b> khi đáp án đoán được mà không cần đọc tài liệu, hoặc chỉ là biến thể của chính tên (tên khác \"Giác Uyển Tự\", chùa Khmer thờ Phật Thích Ca). Còn lại <b>Đạt</b>.", "E": "<b>Tên địa điểm chỉ là cái cớ:</b> <b>Loại</b> khi câu hỏi về sự kiện, tổ chức, nhân vật mà không nói gì về địa điểm. <b>Đạt</b> nếu sự kiện diễn ra tại địa điểm và là lý do địa điểm được công nhận.", "F": "<b>Đáp án lệch loại hoặc thiếu:</b> Hỏi \"đối tượng nào\" mà đáp \"chụp ảnh, thư giãn\"; đáp án bỏ sót ý chính tài liệu nêu rõ → <b>Loại</b>.", "G": "<b>Tên ghép bằng dấu \";\":</b> Tên ghép do bộ dữ liệu đặt, tự nó không phải lỗi → <b>Đạt</b> nếu vẫn hiểu đúng. <b>Loại</b> khi tên ghép làm câu sai nghĩa (\"Gò Chùa Nổi tại Đồn Long Khốt\") hoặc đáp án chỉ đúng cho một phần của tên.", "H": "<b>Không trả lời được, nhiều vế:</b> <b>Đạt</b> nếu các vế cùng một chủ đề (gửi xe + bãi ô tô); <b>Loại</b> nếu gộp hai chủ đề khác nhau (gửi xe + quán ăn).", "I": "<b>Tài liệu có nhiều đáp án đúng:</b> Câu chỉ chấp nhận một đáp án trong khi tài liệu có nhiều (hai nhà cùng làm cơ sở…) → <b>Loại</b>.", "J": "<b>Câu không tự đứng:</b> Phụ thuộc ngữ cảnh tài liệu (\"ông\" là ai, \"được nhắc đến\") hoặc chép nguyên câu văn rồi đục lỗ → <b>Loại</b>."};
+  const RULE_BY_TYPE = {factoid:["C","D","E","F","G","I","J"], multihop:["B","C","F","G"], unanswerable:["A","H","C","J"], compare:["C","F"]};
   const NAME = {r1: "Người 1", r2: "Người 2", r3: "Người kiểm tra", r4: "Người 3"};
   const store = {
     get(k){ try { return localStorage.getItem(k); } catch { return null; } },
@@ -395,7 +410,8 @@ details.guide li{margin:3px 0}
     if (rw) $("rewrite").textContent = "Câu này do máy viết lại từ một câu bị loại vì lỗi tên địa điểm. Câu gốc: " + it.nguon.replace(/^VIẾT LẠI từ [^:]+:\s*/, "") + " — kiểm tra nghĩa có bị lệch không.";
     else if (it.goc) $("rewrite").innerHTML = `<b>Diễn đạt lại của câu ${esc(it.goc.id)}:</b> “${esc(it.goc.question)}” → ${esc(it.goc.answer)}<br>Đạt khi câu mới hỏi đúng cùng ý, tự nhiên, và đáp án vẫn đúng theo tài liệu. Câu gốc có sai hay không không ảnh hưởng: chỉ chấm câu đang hiện.`;
     else if (it.q === "silver") $("rewrite").textContent = "Câu do máy sinh và máy đã chấm Đạt. Chấm như gold: cùng tiêu chí, không nương tay.";
-    $("hint").innerHTML = HINT[it.type] || "";
+    const rl = (RULE_BY_TYPE[it.type] || []).map(k => `<span class="rl"><b class="k">${k}</b>${RULES[k]}</span>`).join("");
+    $("hint").innerHTML = (HINT[it.type] || "") + (rl ? `<span class="rl" style="margin-top:8px;font-weight:600">Quy tắc thống nhất liên quan:</span>${rl}` : "");
     paintDecision(); paintDocs(it);
     window.scrollTo({top:0});
   }
