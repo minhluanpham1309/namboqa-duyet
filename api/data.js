@@ -3,6 +3,9 @@ import { asSeenBy, assignedTo, items, json, passages, readLabels, session } from
 // GET /api/data                 -> chỉ mục gọn {id,q,b} của mọi câu giao cho người đăng nhập
 // GET /api/data?queue=Q&b=N     -> chi tiết các câu của một đợt + đoạn tài liệu chúng cần
 // Hàng dd3 (diễn đạt lại gold vòng 3): ẩn câu có câu gốc đã bị chấm Loại.
+// Câu "không trả lời được" hỏi so sánh với nơi khác (quy tắc A) — để trang có bộ lọc xem lại
+const CMP = /(lớn hơn hay nhỏ hơn|hơn hay (kém|ít|nhỏ|nghèo|thấp|yếu)|so với|so sánh|giống hay khác|tương đồng)/i;
+const isCmp = (it) => it.type === "unanswerable" && CMP.test(it.question) ? 1 : 0;
 const ORDER = ["kiemtra", "gold3", "silver_mau", "silver", "dd1", "dd3"];
 
 async function rejectedSources() {
@@ -26,7 +29,7 @@ export default async function handler(req, res) {
       const otherTotal = {};
       if (other) for (const it of items()) if (assignedTo(it, other) && visible(it)) otherTotal[it.q] = (otherTotal[it.q] || 0) + 1;
       const qs = ORDER.filter((q) => mine.some((it) => it.q === q));
-      return json(res, 200, { role, queues: qs, index: mine.map((it) => [it.id, it.q, it.b]), otherTotal,
+      return json(res, 200, { role, queues: qs, index: mine.map((it) => [it.id, it.q, it.b, isCmp(it)]), otherTotal,
                               hiddenDd3: items().filter((it) => assignedTo(it, role) && !visible(it)).length });
     }
     const sel = mine.filter((it) => it.q === queue && it.b === b);
