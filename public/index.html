@@ -60,6 +60,8 @@ main.wrap{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:1
 .ans{font-size:16px;padding:8px 12px;background:var(--sunk);border-radius:8px;border:1px solid var(--line)}
 .ev{font-family:var(--f-doc);font-size:15px;margin:4px 0 0;padding-left:12px;border-left:3px solid var(--mark)}
 .ev+.ev{margin-top:8px}
+.others{margin-top:12px;font-size:13px;padding:8px 12px;border-radius:8px;border:1px solid var(--line);background:var(--sunk)}
+.others .o1{color:var(--ok);font-weight:600}.others .o0{color:var(--no);font-weight:600}.others .oq{font-weight:600}
 .rewrite{margin-top:12px;font-size:13px;padding:8px 12px;border-radius:8px;background:var(--unsure-bg);border:1px dashed var(--unsure)}
 .hint{margin-top:14px;font-size:13px;color:var(--muted);padding:10px 12px;border-radius:8px;border:1px solid var(--line)}
 .hint b{color:var(--ink)}
@@ -116,7 +118,7 @@ details.guide li{margin:3px 0}
     <h1>Phòng duyệt NamBoQA</h1>
     <p>Mỗi người duyệt đăng nhập bằng mật khẩu riêng. Nhãn của bạn chỉ bạn thấy.</p>
     <label>Bạn là</label>
-    <div class="seg" role="group" aria-label="Vai"><button type="button" id="lr1" aria-pressed="true">Người 1</button><button type="button" id="lr2" aria-pressed="false">Người 2</button><button type="button" id="lr4" aria-pressed="false">Người 3</button><button type="button" id="lr3" aria-pressed="false">Kiểm tra</button></div>
+    <div class="seg" role="group" aria-label="Vai"><button type="button" id="lr1" aria-pressed="true">Người 1</button><button type="button" id="lr2" aria-pressed="false">Người 2</button><button type="button" id="lr4" aria-pressed="false">Người 3</button><button type="button" id="lr3" aria-pressed="false">Kiểm tra</button><button type="button" id="lr5" aria-pressed="false">Phân xử</button></div>
     <label for="pw">Mật khẩu</label>
     <input id="pw" type="password" autocomplete="current-password" required>
     <button class="go" type="submit">Vào duyệt</button>
@@ -159,6 +161,7 @@ details.guide li{margin:3px 0}
       <div class="ans" id="answer"></div>
       <div id="evBox"><div class="lbl">Evidence (chép nguyên văn từ tài liệu)</div><div id="evs"></div></div>
       <div class="rewrite" id="rewrite" hidden></div>
+      <div class="others" id="others" hidden></div>
       <div class="hint" id="hint"></div>
       <div class="decide">
         <button class="b1" id="b1"><span>Đạt</span><kbd>phím 1</kbd></button>
@@ -217,7 +220,7 @@ details.guide li{margin:3px 0}
   const RULE_BY_TYPE = {factoid:["C","D","E","F","G","I","J"], multihop:["B","C","F","G"], unanswerable:["A","H","C","J"], compare:["C","F"]};
   // nhãn Loại có ghi chú bắt đầu bằng mã quy tắc C ("C – …", "Quy tắc C: …")
   const isRuleC = (l) => !!l && l.v === "0" && /^\s*a?(quy tắc\s*)?C(?![\p{L}])/iu.test(l.n || "");
-  const NAME = {r1: "Người 1", r2: "Người 2", r3: "Người kiểm tra", r4: "Người 3"};
+  const NAME = {r1: "Người 1", r2: "Người 2", r3: "Người kiểm tra", r4: "Người 3", r5: "Người phân xử"};
   const store = {
     get(k){ try { return localStorage.getItem(k); } catch { return null; } },
     set(k,v){ try { localStorage.setItem(k,v); } catch {} }
@@ -226,7 +229,7 @@ details.guide li{margin:3px 0}
 
   let role = null, ITEMS = [], PAS = {}, LBL = {}, otherDone = {}, otherTotal = {};
   let QUEUES = [], DETAIL = {}; const LOADED = new Map();   // ITEMS = chỉ mục {id,q,b}; DETAIL = chi tiết đợt đã tải
-  const QNAME = {kiemtra: "Kiểm tra chéo (150 câu)", gold3: "Gold vòng 3", silver_mau: "Mẫu silver", silver: "Silver (máy sinh)", dd1: "Diễn đạt lại · gold vòng 1–2", dd3: "Diễn đạt lại · gold vòng 3"};
+  const QNAME = {phanxu: "Phân xử câu lệch", kiemtra: "Kiểm tra chéo (150 câu)", gold3: "Gold vòng 3", silver_mau: "Mẫu silver", silver: "Silver (máy sinh)", dd1: "Diễn đạt lại · gold vòng 1–2", dd3: "Diễn đạt lại · gold vòng 3"};
   function loadBatch(q, b){
     const k = q + "|" + b;
     if (!LOADED.has(k)) LOADED.set(k, api(`/api/data?queue=${encodeURIComponent(q)}&b=${b}`).then(d => {
@@ -258,8 +261,8 @@ details.guide li{margin:3px 0}
   let loginRole = "r1";
   function showLogin(){
     $("loginView").hidden = false; $("appView").hidden = true;
-    const pick = (r) => { loginRole = r; for (const x of ["r1","r2","r3","r4"]) $("l"+x).setAttribute("aria-pressed", r===x); };
-    $("lr1").onclick = () => pick("r1"); $("lr2").onclick = () => pick("r2"); $("lr3").onclick = () => pick("r3"); $("lr4").onclick = () => pick("r4");
+    const pick = (r) => { loginRole = r; for (const x of ["r1","r2","r3","r4","r5"]) $("l"+x).setAttribute("aria-pressed", r===x); };
+    $("lr1").onclick = () => pick("r1"); $("lr2").onclick = () => pick("r2"); $("lr3").onclick = () => pick("r3"); $("lr4").onclick = () => pick("r4"); $("lr5").onclick = () => pick("r5");
     pick(store.get("nb_last_role") || "r1");
     $("loginForm").onsubmit = async (e) => {
       e.preventDefault(); $("loginErr").textContent = "";
@@ -416,6 +419,10 @@ details.guide li{margin:3px 0}
     if (rw) $("rewrite").textContent = "Câu này do máy viết lại từ một câu bị loại vì lỗi tên địa điểm. Câu gốc: " + it.nguon.replace(/^VIẾT LẠI từ [^:]+:\s*/, "") + " — kiểm tra nghĩa có bị lệch không.";
     else if (it.goc) $("rewrite").innerHTML = `<b>Diễn đạt lại của câu ${esc(it.goc.id)}:</b> “${esc(it.goc.question)}” → ${esc(it.goc.answer)}<br>Đạt khi câu mới hỏi đúng cùng ý, tự nhiên, và đáp án vẫn đúng theo tài liệu. Câu gốc có sai hay không không ảnh hưởng: chỉ chấm câu đang hiện.`;
     else if (it.q === "silver") $("rewrite").textContent = "Câu do máy sinh và máy đã chấm Đạt. Chấm như gold: cùng tiêu chí, không nương tay.";
+    $("others").hidden = !it.others;
+    if (it.others) $("others").innerHTML = `<b>Hàng gốc: ${esc(QNAME[it.hang] || it.hang)}.</b> Nhãn của người chấm (chấm lệch, chưa có đa số): `
+      + it.others.map(o => `<div>${esc(o.ten)}: <span class="${o.v==="1"?"o1":o.v==="0"?"o0":"oq"}">${o.v==="1"?"Đạt":o.v==="0"?"Loại":"Chưa chắc"}</span>${o.n ? " — " + esc(o.n) : ""}</div>`).join("")
+      + `<div style="margin-top:6px">Đọc tài liệu rồi tự quyết theo tiêu chí và quy tắc A–J; nhãn của bạn là nhãn cuối cùng.</div>`;
     const rl = (RULE_BY_TYPE[it.type] || []).map(k => `<span class="rl"><b class="k">${k}</b>${RULES[k]}</span>`).join("");
     $("hint").innerHTML = (HINT[it.type] || "") + (rl ? `<span class="rl" style="margin-top:8px;font-weight:600">Quy tắc thống nhất liên quan:</span>${rl}` : "");
     paintDecision(); paintDocs(it);

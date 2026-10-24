@@ -6,7 +6,8 @@ import { asSeenBy, assignedTo, items, json, passages, readLabels, session } from
 // Câu "không trả lời được" hỏi so sánh với nơi khác (quy tắc A) — để trang có bộ lọc xem lại
 const CMP = /(lớn hơn hay nhỏ hơn|hơn hay (kém|ít|nhỏ|nghèo|thấp|yếu)|so với|so sánh|giống hay khác|tương đồng)/i;
 const isCmp = (it) => it.type === "unanswerable" && CMP.test(it.question) ? 1 : 0;
-const ORDER = ["kiemtra", "gold3", "silver_mau", "silver", "dd1", "dd3"];
+const ORDER = ["phanxu", "kiemtra", "gold3", "silver_mau", "silver", "dd1", "dd3"];
+const TEN = { r1: "Người 1", r2: "Người 2", r4: "Người 3" };
 
 async function rejectedSources() {
   const all = await Promise.all([readLabels("r1"), readLabels("r2"), readLabels("r4")]);
@@ -23,7 +24,7 @@ export default async function handler(req, res) {
     const queue = u.searchParams.get("queue"), b = +u.searchParams.get("b");
     const rej = await rejectedSources();
     const visible = (it) => !(it.q === "dd3" && it.goc && rej.has(it.goc.id));
-    const mine = items().filter((it) => assignedTo(it, role) && (role === "r3" || visible(it))).map((it) => asSeenBy(it, role));
+    const mine = items().filter((it) => assignedTo(it, role) && (role === "r3" || role === "r5" || visible(it))).map((it) => asSeenBy(it, role));
     if (!queue) {
       const other = role === "r1" ? "r2" : role === "r2" ? "r1" : null;
       const otherTotal = {};
@@ -35,6 +36,12 @@ export default async function handler(req, res) {
     const sel = mine.filter((it) => it.q === queue && it.b === b);
     const P = passages(), pas = {};
     for (const it of sel) for (const p of it.ctx) pas[p] = P[p];
+    if (role === "r5") {   // người phân xử thấy nhãn và ghi chú của cả ba người chấm
+      const L = await Promise.all(Object.keys(TEN).map(readLabels));
+      const out = sel.map((it) => ({ ...it, others: Object.keys(TEN).map((r, i) => L[i][it.id]
+        ? { ten: TEN[r], v: L[i][it.id].v, n: L[i][it.id].n || "" } : null).filter(Boolean) }));
+      return json(res, 200, { items: out, passages: pas });
+    }
     return json(res, 200, { items: sel, passages: pas });
   } catch (e) {
     console.error("data", e?.message);

@@ -9,7 +9,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
-export const ROLES = ["r1", "r2", "r3", "r4"];   // r3 = kiểm tra chéo 150 câu; r4 = Người 3, duyệt toàn bộ dữ liệu
+export const ROLES = ["r1", "r2", "r3", "r4", "r5"];   // r3 = kiểm tra chéo 150 câu; r4 = Người 3, duyệt toàn bộ; r5 = phân xử câu lệch
 const COOKIE = "nb";
 const MAX_AGE = 14 * 24 * 3600;
 
@@ -78,9 +78,26 @@ export function passages() {
 }
 let _kt = null;
 const kiemtra = () => (_kt ??= new Set(JSON.parse(fs.readFileSync(path.join(process.cwd(), "data/kiemtra.json"), "utf8")).ids));
-export const assignedTo = (it, role) => role === "r3" ? kiemtra().has(it.id) : role === "r4" ? true : (it.a === "both" || it.a === role);
-// r3 thấy các câu kiểm tra như một hàng riêng "kiemtra", một đợt
-export const asSeenBy = (it, role) => role === "r3" ? { ...it, q: "kiemtra", b: 1 } : it;
+// Phân xử (r5): các câu người chấm lệch nhau mà không có đa số (danh sách xuất từ gop_nhan.py).
+// Chia đợt 50 câu, không trộn hai hàng gốc trong một đợt; gold vòng 3 đứng đầu.
+let _px = null;
+const phanxu = () => {
+  if (_px) return _px;
+  const ids = JSON.parse(fs.readFileSync(path.join(process.cwd(), "data/phanxu.json"), "utf8")).ids;
+  const q = new Map(items().map((it) => [it.id, it.q]));
+  const b = new Map();
+  let cur = 0, prev = null, n = 0;
+  for (const id of ids) {
+    if (q.get(id) !== prev || n === 50) { cur++; n = 0; prev = q.get(id); }
+    b.set(id, cur); n++;
+  }
+  return (_px = b);
+};
+export const assignedTo = (it, role) => role === "r3" ? kiemtra().has(it.id) : role === "r5" ? phanxu().has(it.id)
+  : role === "r4" ? true : (it.a === "both" || it.a === role);
+// r3 thấy các câu kiểm tra như một hàng riêng "kiemtra", một đợt; r5 thấy hàng "phanxu"
+export const asSeenBy = (it, role) => role === "r3" ? { ...it, q: "kiemtra", b: 1 }
+  : role === "r5" ? { ...it, q: "phanxu", b: phanxu().get(it.id), hang: it.q } : it;
 
 // ---------------------------------------------------------------- nhãn
 // Lưu trong Upstash Redis (REST): mỗi vai một hash  nb:labels:<vai>  {id -> JSON {v,n,t}}.
