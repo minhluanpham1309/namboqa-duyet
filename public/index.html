@@ -133,7 +133,7 @@ details.guide li{margin:3px 0}
     </label>
     <label class="ctl" for="batch">Đợt <select id="batch"></select></label>
     <label class="ctl" for="filter">Hiện
-      <select id="filter"><option value="todo">Chưa duyệt</option><option value="all">Tất cả</option><option value="q">Chưa chắc</option><option value="done">Đã duyệt</option><option value="lnote">Loại chưa ghi chú</option><option value="ruleA">Xem lại quy tắc A (so sánh, đang Đạt)</option></select>
+      <select id="filter"><option value="todo">Chưa duyệt</option><option value="all">Tất cả</option><option value="q">Chưa chắc</option><option value="done">Đã duyệt</option><option value="lnote">Loại chưa ghi chú</option><option value="ruleA">Xem lại quy tắc A (so sánh, đang Đạt)</option><option value="ruleC">Xem lại quy tắc C (đang Loại theo C)</option></select>
     </label>
     <div class="prog" aria-live="polite">
       <div class="row"><span id="progLbl">Đợt này</span><span id="progNum">–</span></div>
@@ -184,7 +184,7 @@ details.guide li{margin:3px 0}
         <ul class="rules">
           <li><b>A. So sánh với địa điểm khác:</b> Câu kiểu "lớn hơn hay nhỏ hơn so với X", "khác gì so với X" (X không có trong tài liệu) → <b>Loại</b>.</li>
           <li><b>B. Multihop hai vế:</b> "…năm nào và…ở đâu?": <b>Đạt</b> nếu mỗi vế lấy từ một đoạn khác nhau và câu gọn; <b>Loại</b> nếu một đoạn đã đủ cả hai vế hoặc đáp án quá dài.</li>
-          <li><b>C. Tên chung, không biết nơi nào:</b> Tên là danh từ chung hoặc trùng tên ("Vườn cây cao su thời Pháp thuộc", "Chùa Từ Quang" có hai chùa) mà câu không nêu địa danh → <b>Loại</b>.</li>
+          <li><b>C. Tên chung, không biết nơi nào:</b> Chỉ <b>Loại</b> khi tên là <b>danh từ chung</b>, không phải tên riêng ("Vườn cây cao su thời Pháp thuộc", "Các công trình kiến trúc thời Pháp"), hoặc <b>tài liệu nêu rõ</b> có nơi khác cùng tên ("Chùa Từ Quang": tài liệu nhắc cả chùa ở Gò Vấp). <b>Không Loại</b> chỉ vì tên riêng <i>có thể</i> trùng ở tỉnh khác (Đình Tân Hưng, Linh Sơn Cổ Tự…). Với câu diễn đạt lại: câu gốc đã dùng cùng tên thì không Loại vì C.</li>
           <li><b>D. Câu hiển nhiên:</b> Chỉ <b>Loại</b> khi đáp án đoán được mà không cần đọc tài liệu, hoặc chỉ là biến thể của chính tên (tên khác "Giác Uyển Tự", chùa Khmer thờ Phật Thích Ca). Còn lại <b>Đạt</b>.</li>
           <li><b>E. Tên địa điểm chỉ là cái cớ:</b> <b>Loại</b> khi câu hỏi về sự kiện, tổ chức, nhân vật mà không nói gì về địa điểm. <b>Đạt</b> nếu sự kiện diễn ra tại địa điểm và là lý do địa điểm được công nhận.</li>
           <li><b>F. Đáp án lệch loại hoặc thiếu:</b> Hỏi "đối tượng nào" mà đáp "chụp ảnh, thư giãn"; đáp án bỏ sót ý chính tài liệu nêu rõ → <b>Loại</b>.</li>
@@ -213,8 +213,10 @@ details.guide li{margin:3px 0}
     compare: "<b>Compare:</b> phải so đúng một thuộc tính chung mà cả hai tài liệu đều nêu.",
     unanswerable: "<b>Không trả lời được:</b> đọc hết các đoạn bên phải. Chỉ Đạt khi tài liệu thật sự không có câu trả lời và câu hỏi hợp lý, tự nhiên."
   };
-  const RULES = {"A": "<b>So sánh với địa điểm khác:</b> Câu kiểu \"lớn hơn hay nhỏ hơn so với X\", \"khác gì so với X\" (X không có trong tài liệu) → <b>Loại</b>.", "B": "<b>Multihop hai vế:</b> \"…năm nào và…ở đâu?\": <b>Đạt</b> nếu mỗi vế lấy từ một đoạn khác nhau và câu gọn; <b>Loại</b> nếu một đoạn đã đủ cả hai vế hoặc đáp án quá dài.", "C": "<b>Tên chung, không biết nơi nào:</b> Tên là danh từ chung hoặc trùng tên (\"Vườn cây cao su thời Pháp thuộc\", \"Chùa Từ Quang\" có hai chùa) mà câu không nêu địa danh → <b>Loại</b>.", "D": "<b>Câu hiển nhiên:</b> Chỉ <b>Loại</b> khi đáp án đoán được mà không cần đọc tài liệu, hoặc chỉ là biến thể của chính tên (tên khác \"Giác Uyển Tự\", chùa Khmer thờ Phật Thích Ca). Còn lại <b>Đạt</b>.", "E": "<b>Tên địa điểm chỉ là cái cớ:</b> <b>Loại</b> khi câu hỏi về sự kiện, tổ chức, nhân vật mà không nói gì về địa điểm. <b>Đạt</b> nếu sự kiện diễn ra tại địa điểm và là lý do địa điểm được công nhận.", "F": "<b>Đáp án lệch loại hoặc thiếu:</b> Hỏi \"đối tượng nào\" mà đáp \"chụp ảnh, thư giãn\"; đáp án bỏ sót ý chính tài liệu nêu rõ → <b>Loại</b>.", "G": "<b>Tên ghép bằng dấu \";\":</b> Tên ghép do bộ dữ liệu đặt, tự nó không phải lỗi → <b>Đạt</b> nếu vẫn hiểu đúng. <b>Loại</b> khi tên ghép làm câu sai nghĩa (\"Gò Chùa Nổi tại Đồn Long Khốt\") hoặc đáp án chỉ đúng cho một phần của tên.", "H": "<b>Không trả lời được, nhiều vế:</b> <b>Đạt</b> nếu các vế cùng một chủ đề (gửi xe + bãi ô tô); <b>Loại</b> nếu gộp hai chủ đề khác nhau (gửi xe + quán ăn).", "I": "<b>Tài liệu có nhiều đáp án đúng:</b> Câu chỉ chấp nhận một đáp án trong khi tài liệu có nhiều (hai nhà cùng làm cơ sở…) → <b>Loại</b>.", "J": "<b>Câu không tự đứng:</b> Phụ thuộc ngữ cảnh tài liệu (\"ông\" là ai, \"được nhắc đến\") hoặc chép nguyên câu văn rồi đục lỗ → <b>Loại</b>."};
+  const RULES = {"A": "<b>So sánh với địa điểm khác:</b> Câu kiểu \"lớn hơn hay nhỏ hơn so với X\", \"khác gì so với X\" (X không có trong tài liệu) → <b>Loại</b>.", "B": "<b>Multihop hai vế:</b> \"…năm nào và…ở đâu?\": <b>Đạt</b> nếu mỗi vế lấy từ một đoạn khác nhau và câu gọn; <b>Loại</b> nếu một đoạn đã đủ cả hai vế hoặc đáp án quá dài.", "C": "<b>Tên chung, không biết nơi nào:</b> Chỉ <b>Loại</b> khi tên là <b>danh từ chung</b>, không phải tên riêng (\"Vườn cây cao su thời Pháp thuộc\", \"Các công trình kiến trúc thời Pháp\"), hoặc <b>tài liệu nêu rõ</b> có nơi khác cùng tên (\"Chùa Từ Quang\": tài liệu nhắc cả chùa ở Gò Vấp). <b>Không Loại</b> chỉ vì tên riêng <i>có thể</i> trùng ở tỉnh khác (Đình Tân Hưng, Linh Sơn Cổ Tự…). Với câu diễn đạt lại: câu gốc đã dùng cùng tên thì không Loại vì C.", "D": "<b>Câu hiển nhiên:</b> Chỉ <b>Loại</b> khi đáp án đoán được mà không cần đọc tài liệu, hoặc chỉ là biến thể của chính tên (tên khác \"Giác Uyển Tự\", chùa Khmer thờ Phật Thích Ca). Còn lại <b>Đạt</b>.", "E": "<b>Tên địa điểm chỉ là cái cớ:</b> <b>Loại</b> khi câu hỏi về sự kiện, tổ chức, nhân vật mà không nói gì về địa điểm. <b>Đạt</b> nếu sự kiện diễn ra tại địa điểm và là lý do địa điểm được công nhận.", "F": "<b>Đáp án lệch loại hoặc thiếu:</b> Hỏi \"đối tượng nào\" mà đáp \"chụp ảnh, thư giãn\"; đáp án bỏ sót ý chính tài liệu nêu rõ → <b>Loại</b>.", "G": "<b>Tên ghép bằng dấu \";\":</b> Tên ghép do bộ dữ liệu đặt, tự nó không phải lỗi → <b>Đạt</b> nếu vẫn hiểu đúng. <b>Loại</b> khi tên ghép làm câu sai nghĩa (\"Gò Chùa Nổi tại Đồn Long Khốt\") hoặc đáp án chỉ đúng cho một phần của tên.", "H": "<b>Không trả lời được, nhiều vế:</b> <b>Đạt</b> nếu các vế cùng một chủ đề (gửi xe + bãi ô tô); <b>Loại</b> nếu gộp hai chủ đề khác nhau (gửi xe + quán ăn).", "I": "<b>Tài liệu có nhiều đáp án đúng:</b> Câu chỉ chấp nhận một đáp án trong khi tài liệu có nhiều (hai nhà cùng làm cơ sở…) → <b>Loại</b>.", "J": "<b>Câu không tự đứng:</b> Phụ thuộc ngữ cảnh tài liệu (\"ông\" là ai, \"được nhắc đến\") hoặc chép nguyên câu văn rồi đục lỗ → <b>Loại</b>."};
   const RULE_BY_TYPE = {factoid:["C","D","E","F","G","I","J"], multihop:["B","C","F","G"], unanswerable:["A","H","C","J"], compare:["C","F"]};
+  // nhãn Loại có ghi chú bắt đầu bằng mã quy tắc C ("C – …", "Quy tắc C: …")
+  const isRuleC = (l) => !!l && l.v === "0" && /^\s*a?(quy tắc\s*)?C(?![\p{L}])/iu.test(l.n || "");
   const NAME = {r1: "Người 1", r2: "Người 2", r3: "Người kiểm tra", r4: "Người 3"};
   const store = {
     get(k){ try { return localStorage.getItem(k); } catch { return null; } },
@@ -366,8 +368,9 @@ details.guide li{margin:3px 0}
     $("batch").innerHTML = bs.map(b => {
       const all = ITEMS.filter(x => mine(x) && x.b===b); const d = all.filter(x => LBL[x.id]).length;
       const thieu = filter==="lnote" ? all.filter(x => LBL[x.id] && LBL[x.id].v==="0" && !(LBL[x.id].n||"").trim()).length
-                  : filter==="ruleA" ? all.filter(x => x.cmp && LBL[x.id] && LBL[x.id].v!=="0").length : 0;
-      return `<option value="${b}">${b} · ${d}/${all.length}${filter==="lnote" ? " · thiếu " + thieu : filter==="ruleA" ? " · cần xem " + thieu : ""}</option>`; }).join("");
+                  : filter==="ruleA" ? all.filter(x => x.cmp && LBL[x.id] && LBL[x.id].v!=="0").length
+                  : filter==="ruleC" ? all.filter(x => isRuleC(LBL[x.id])).length : 0;
+      return `<option value="${b}">${b} · ${d}/${all.length}${filter==="lnote" ? " · thiếu " + thieu : (filter==="ruleA" || filter==="ruleC") ? " · cần xem " + thieu : ""}</option>`; }).join("");
     $("batch").value = batch;
     if (bs.length && !LOADED.has(queue + "|" + batch)) showEmpty("Đang tải đợt " + batch + "…");
     if (bs.length) {
@@ -380,10 +383,11 @@ details.guide li{margin:3px 0}
     view = base.filter(x => { const l = LBL[x.id];
       return filter==="all" ? true : filter==="todo" ? !l : filter==="q" ? (l && l.v==="?")
         : filter==="lnote" ? (l && l.v==="0" && !(l.n || "").trim())
-        : filter==="ruleA" ? (x.cmp && l && l.v!=="0") : !!l; })
+        : filter==="ruleA" ? (x.cmp && l && l.v!=="0")
+        : filter==="ruleC" ? isRuleC(l) : !!l; })
       .map(x => DETAIL[x.id]).filter(Boolean);
     if (!bs.length) { showEmpty("Không có câu nào giao cho bạn ở hàng này."); refreshCounts(); return; }
-    if (!view.length) { showEmpty(filter==="ruleA" ? "Đợt này không còn câu so sánh nào đang Đạt. Chọn đợt hoặc hàng khác ở thanh trên (số “cần xem” hiện cạnh từng đợt)." : filter==="lnote" ? "Đợt này không còn câu Loại nào thiếu ghi chú. Chọn đợt khác ở thanh trên." : filter==="todo" ? "Đợt này bạn đã duyệt xong. Chọn đợt khác ở thanh trên, hoặc đổi bộ lọc sang “Tất cả” để xem lại." : "Không có câu nào khớp bộ lọc."); refreshCounts(); return; }
+    if (!view.length) { showEmpty(filter==="ruleC" ? "Đợt này không còn câu nào đang Loại theo quy tắc C. Chọn đợt hoặc hàng khác (số “cần xem” hiện cạnh từng đợt)." : filter==="ruleA" ? "Đợt này không còn câu so sánh nào đang Đạt. Chọn đợt hoặc hàng khác ở thanh trên (số “cần xem” hiện cạnh từng đợt)." : filter==="lnote" ? "Đợt này không còn câu Loại nào thiếu ghi chú. Chọn đợt khác ở thanh trên." : filter==="todo" ? "Đợt này bạn đã duyệt xong. Chọn đợt khác ở thanh trên, hoặc đổi bộ lọc sang “Tất cả” để xem lại." : "Không có câu nào khớp bộ lọc."); refreshCounts(); return; }
     let s = 0;
     const saved = store.get(`nb_pos_${role}_${queue}_${batch}`);
     if (keepPos && curId) { const k = view.findIndex(x=>x.id===curId); if (k>=0) s=k; }
